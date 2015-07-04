@@ -63,7 +63,7 @@ __global__ void getPsi_cuda(const double* molOrbitals, const double* primFunc, d
 	extern __shared__ double dcopy[];
 	unsigned int idx = blockIdx.x * blockDim.x + threadIdx.x;
 	dcopy[threadIdx.x] = molOrbitals[idx] * primFunc[threadIdx.x];
-//	printf("GPU_1: molOrbitals[%d] = %5.16f\n", idx, molOrbitals[idx]);
+	printf("GPU_1: molOrbitals[%d](%5.10f) * primFunc[%d](%5.10f) = %5.16f\n", idx, molOrbitals[idx],threadIdx.x,primFunc[threadIdx.x], dcopy[threadIdx.x]);
 //	printf("GPU idx = %d and value is : %f\n", idx, dcopy[threadIdx.x]);
 //	__syncthreads();
 //	if (threadIdx.x == 0)
@@ -371,11 +371,24 @@ int main()
 
 	getDistanceAbs(calcPoint, numOfNucl, r_dist, 1);
 
+	getGRHO(numOfPrimFunc, molTypeFunc, r_dist, exponents, calcPoint, powcoef, primFunc, dermodvar, hesmodvar, HESS, 0);
 
-////////////////////////////////////////////                  BEGIN DISTANCE DEBUG                                /////////////////////////////////////
+	getHesPSI(numOfPrimFunc, numOfNucl, (const double **)molOrbitals, (const double ***)hesmodvar, hespsi, 0 );
+
+	getPsi(numOfPrimFunc, numOfNucl, (const double **)molOrbitals, primFunc, psi, 1);
+
+	getDPsi(numOfPrimFunc, numOfNucl, (const double **)molOrbitals, (const double **)dermodvar, dpsi, 1);
+
+	double somedouble;
+	getRho(numOfNucl,  psi, occNo, &somedouble, 1);
+
+	getDRho(numOfNucl,  psi,  (const double **)dpsi, occNo, drho, 1);
 
 
 
+
+
+	////////////////////////////////////////////                  BEGIN CUDA MALLOC                                /////////////////////////////////////
 	double *cur_cuda, *origin_cuda, *out_cuda, *dist_cuda;
 
 	CUDA_CHECK_RETURN(cudaMalloc((void **)&cur_cuda, sizeof(double)*3));
@@ -383,37 +396,153 @@ int main()
 	CUDA_CHECK_RETURN(cudaMalloc((void **)&out_cuda, sizeof(double)*3*numOfNucl));
 	CUDA_CHECK_RETURN(cudaMalloc((void **)&dist_cuda, sizeof(double)*numOfNucl));
 
+	double *psi_cuda, *primFunc_cuda, *molOrbitals_cuda;
+
+	CUDA_CHECK_RETURN(cudaMalloc((void **)&psi_cuda, sizeof(double) * numOfNucl));
+	CUDA_CHECK_RETURN(cudaMalloc((void **)&molOrbitals_cuda, sizeof(double) * numOfNucl * numOfPrimFunc));
+	CUDA_CHECK_RETURN(cudaMalloc((void **)&primFunc_cuda, sizeof(double) * numOfPrimFunc));
+
+	double *dpsi_cuda,  *dermodvar_cuda;
+
+	CUDA_CHECK_RETURN(cudaMalloc((void **)&dpsi_cuda, sizeof(double)*3*numOfNucl));
+	CUDA_CHECK_RETURN(cudaMalloc((void **)&dermodvar_cuda, sizeof(double)*3*numOfPrimFunc));
+
+	double *occNo_cuda, *rho_cuda;
+
+	CUDA_CHECK_RETURN(cudaMalloc((void **)&occNo_cuda, sizeof(double) * numOfNucl));
+	CUDA_CHECK_RETURN(cudaMalloc((void **)&rho_cuda, sizeof(double)));
+
+	double *drho_cuda;
+	CUDA_CHECK_RETURN(cudaMalloc((void **)&drho_cuda, sizeof(double)*3));
+//	double *dpsi_cuda,
+	/*	CUDA_CHECK_RETURN(cudaMalloc((void **)&dpsi_cuda, sizeof(double)*3*numOfNucl));*/
+
+	////////////////////////////////////////////                  END CUDA MALLOC                                /////////////////////////////////////
+
+	////////////////////////////////////////////                  BEGIN MALLOC to check CUDA functions                                /////////////////////////////////////
+
 	double *temp_data = (double*)malloc(3*sizeof(double));
-	temp_data[0] = startPoint->x;
-	temp_data[1] = startPoint->y;
-	temp_data[2] = startPoint->z;
-
 	double *temp_origin = (double*)malloc(numOfNucl*3*sizeof(double));
-	for(int i = 0; i < numOfNucl; ++i)
-	{
-		temp_origin[i*3+0] = origin[i].x;
-		temp_origin[i*3+1] = origin[i].y;
-		temp_origin[i*3+2] = origin[i].z;
-	}
-
 	double *temp_out = (double*)malloc(numOfNucl*3*sizeof(double));
 	double *temp_out_r = (double*)malloc(numOfNucl*sizeof(double));
+	double  *psi_out, *temp_molOrbitals, *temp_primFunc;
 
-//	printf("BEFORE COPY:\n");
-//	for(int i = 0; i < numOfNucl; ++i)
-//	{
-//		printf("Temp_origin %d  = %f %f %f;\n",i, temp_origin[i*3], temp_origin[3*i+1], temp_origin[3*i+2]);
-//	}
-//
-//	for(int i = 0; i < 3; ++i)
-//	{
-//		printf("Temp_data %d = %f;\n",i, temp_data[i]);
-//	}
+	temp_molOrbitals = (double*)malloc(sizeof(double)*numOfNucl*numOfPrimFunc);
+	temp_primFunc = (double*)malloc(sizeof(double) *numOfPrimFunc );
+	psi_out = (double*)malloc(sizeof(double) * numOfNucl);
+
+	double  *dermodvar_temp, *temp_dpsi;
+	temp_dpsi = (double*)malloc(sizeof(double) * 3 * numOfNucl);
+	dermodvar_temp = (double*)malloc(sizeof(double) * 3*numOfPrimFunc);
+	double /**temp_psi, */*temp_occNo, *rho_out;
+
+	rho_out = (double*)malloc(sizeof(double));
+//	temp_psi = (double*)malloc(sizeof(double) * numOfNucl);
+	temp_occNo = (double*)malloc(sizeof(double) * numOfNucl);
+
+	/*double  *temp_dpsi */;
+	/*temp_dpsi = (double*)malloc(sizeof(double) * 3 * numOfNucl);*/
+	 double *temp_drho;
+	temp_drho = (double*)malloc(sizeof(double) * 3 );
+
+	////////////////////////////////////////////                  END MALLOC to check CUDA functions                                /////////////////////////////////////
+
+
+	////////////////////////////////////////////                  BEGIN preparation DUMMY variables to check CUDA functions                                /////////////////////////////////////
+
+	temp_data[0] = startPoint->x;
+		temp_data[1] = startPoint->y;
+		temp_data[2] = startPoint->z;
+
+
+		for(int i = 0; i < numOfNucl; ++i)
+		{
+			temp_origin[i*3+0] = origin[i].x;
+			temp_origin[i*3+1] = origin[i].y;
+			temp_origin[i*3+2] = origin[i].z;
+		}
+
+	//	printf("BEFORE COPY:\n");
+	//	for(int i = 0; i < numOfNucl; ++i)
+	//	{
+	//		printf("Temp_origin %d  = %f %f %f;\n",i, temp_origin[i*3], temp_origin[3*i+1], temp_origin[3*i+2]);
+	//	}
+	//
+	//	for(int i = 0; i < 3; ++i)
+	//	{
+	//		printf("Temp_data %d = %f;\n",i, temp_data[i]);
+	//	}
+		for(int j = 0; j < numOfNucl; ++j)
+			for(int i = 1; i < numOfPrimFunc; ++i)
+			{
+				temp_molOrbitals[j*numOfPrimFunc + i] = molOrbitals[j][i];
+	//			printf("DEBUG print for molOrbitals i=%d j=%d (%d): %f\n", i, j, j*numOfPrimFunc + i,molOrbitals[j][i]);
+			}
+
+	//	for(int i = 0; i < numOfNucl *numOfPrimFunc; ++i )
+	//		printf("DEBUG print (COMPR) for i=%d : %f\n", i, temp_molOrbitals[i]);
+
+
+		for (int j = 1; j < numOfPrimFunc; ++j)
+			temp_primFunc[j] = primFunc[j];
+
+		for (int i = 0; i < numOfPrimFunc; ++i)
+		{
+			dermodvar_temp[3*i] = dermodvar[i][0];
+			dermodvar_temp[3*i + 1] = dermodvar[i][1];
+			dermodvar_temp[3*i + 2] = dermodvar[i][2];
+	//		printf("dermodvar[%d][%d] [0]=%f, [1]=%f, [2]=%f \n",3*i,i,dermodvar[i][0],dermodvar[i][1],dermodvar[i][2]);
+		}
+
+	//	for (int i = 0; i < numOfPrimFunc*3; ++i)
+	//		printf("dermodvar[%d] = %f \n",i,dermodvar_temp[i]);
+		for(int i = 0; i < numOfNucl; ++i)
+		{
+	//		temp_psi[i] = psi[i];
+			temp_occNo[i] = occNo[i];
+		}
+
+	//	for(int i = 0; i < numOfNucl; ++i)
+	//		for(int j = 0; j < 3; ++j)
+	//		{
+	//			temp_dpsi[j*numOfNucl + i] = dpsi[i][j];
+	//		}
+
+	//	for(int i = 0; i < numOfNucl * 3; ++i)
+	//	{
+	//		printf("DEBUG print (COMPR) for i=%d : %f\n", i, temp_dpsi[i]);
+	//	}
+
+
+////////////////////////////////////////////                  END preparation DUMMY variables to check CUDA functions                                /////////////////////////////////////
+
+
+////////////////////////////////////////////                  BEGIN COPYING DUMMY variables to GPU MEMORY                               /////////////////////////////////////
 
 	CUDA_CHECK_RETURN(cudaMemcpy(cur_cuda, temp_data, sizeof(double)*3, cudaMemcpyHostToDevice));
 	CUDA_CHECK_RETURN(cudaMemcpy(origin_cuda, temp_origin, sizeof(double)*3*numOfNucl, cudaMemcpyHostToDevice));
+	CUDA_CHECK_RETURN(cudaMemcpy(molOrbitals_cuda, temp_molOrbitals, sizeof(double)*numOfNucl*numOfPrimFunc, cudaMemcpyHostToDevice));
+	CUDA_CHECK_RETURN(cudaMemcpy(primFunc_cuda, temp_primFunc, sizeof(double)*numOfPrimFunc, cudaMemcpyHostToDevice));
+	CUDA_CHECK_RETURN(cudaMemcpy(dermodvar_cuda, dermodvar_temp, sizeof(double)*3*numOfPrimFunc, cudaMemcpyHostToDevice));
+//	CUDA_CHECK_RETURN(cudaMemcpy(psi_cuda, temp_psi, sizeof(double)*numOfNucl, cudaMemcpyHostToDevice));
+	CUDA_CHECK_RETURN(cudaMemcpy(occNo_cuda, temp_occNo, sizeof(double)*numOfNucl, cudaMemcpyHostToDevice));
+//	CUDA_CHECK_RETURN(cudaMemcpy(dpsi_cuda, temp_dpsi, sizeof(double)*numOfNucl*3, cudaMemcpyHostToDevice));
+
+////////////////////////////////////////////                  END COPYING DUMMY variables to GPU MEMORY                                /////////////////////////////////////
+
 
 	getDistanceComp_cuda<<<numOfNucl/*BLOCK_COUNT*/, 3/*BLOCK_SIZE*/, 3*sizeof(double)>>> (cur_cuda, origin_cuda, out_cuda, dist_cuda);
+
+	getPsi_cuda<<<numOfNucl/*BLOCK_COUNT*/, numOfPrimFunc/*BLOCK_SIZE*/, numOfPrimFunc*sizeof(double)>>> (molOrbitals_cuda, primFunc_cuda, psi_cuda);
+
+	getDPsi_cuda<<<dim3(numOfNucl,3,1), numOfPrimFunc, numOfPrimFunc*sizeof(double)>>> (molOrbitals_cuda, dermodvar_cuda, dpsi_cuda);
+
+	getRho_cuda<<<1/*BLOCK_COUNT*/, numOfNucl/*BLOCK_SIZE*/, numOfNucl*sizeof(double)>>> (psi_cuda, occNo_cuda, rho_cuda);
+
+	getDRho_cuda<<<3/*BLOCK_COUNT*/, numOfNucl/*BLOCK_SIZE*/, numOfNucl*sizeof(double)>>> (psi_cuda, dpsi_cuda, occNo_cuda, drho_cuda);
+
+
+	////////////////////////////////////////////                  COPY RESULTS FROM GPU                                 /////////////////////////////////////
 
 	CUDA_CHECK_RETURN(cudaMemcpy(temp_out, out_cuda, 3*numOfNucl*sizeof(double), cudaMemcpyDeviceToHost));
 	CUDA_CHECK_RETURN(cudaMemcpy(temp_out_r, dist_cuda, numOfNucl*sizeof(double), cudaMemcpyDeviceToHost));
@@ -431,173 +560,29 @@ int main()
 	}
 	printf("\n");
 
-////////////////////////////////////////////                  END DISTANCE DEBUG                                /////////////////////////////////////
-
-
-
-//	getDistanceAbs(calcPoint, numOfNucl, r_dist, 0);
-
-	getGRHO(numOfPrimFunc, molTypeFunc, r_dist, exponents, calcPoint, powcoef, primFunc, dermodvar, hesmodvar, HESS, 0);
-
-	getHesPSI(numOfPrimFunc, numOfNucl, (const double **)molOrbitals, (const double ***)hesmodvar, hespsi, 0 );
-
-	getPsi(numOfPrimFunc, numOfNucl, (const double **)molOrbitals, primFunc, psi, 1);
-
-
-////////////////////////////////////////////                  BEGIN PSI DEBUG                                /////////////////////////////////////
-
-
-
-
-
-	double *psi_cuda, *occNo_cuda, *rho_cuda, *psi_out, *temp_molOrbitals, *temp_primFunc, *primFunc_cuda, *molOrbitals_cuda;
-
-	CUDA_CHECK_RETURN(cudaMalloc((void **)&psi_cuda, sizeof(double) * numOfNucl));
-	CUDA_CHECK_RETURN(cudaMalloc((void **)&molOrbitals_cuda, sizeof(double) * numOfNucl * numOfPrimFunc));
-	CUDA_CHECK_RETURN(cudaMalloc((void **)&primFunc_cuda, sizeof(double) * numOfPrimFunc));
-
-	temp_molOrbitals = (double*)malloc(sizeof(double)*numOfNucl*numOfPrimFunc);
-	for(int j = 0; j < numOfNucl; ++j)
-		for(int i = 1; i < numOfPrimFunc; ++i)
-		{
-			temp_molOrbitals[j*numOfPrimFunc + i] = molOrbitals[j][i];
-//			printf("DEBUG print for molOrbitals i=%d j=%d (%d): %f\n", i, j, j*numOfPrimFunc + i,molOrbitals[j][i]);
-		}
-
-//	for(int i = 0; i < numOfNucl *numOfPrimFunc; ++i )
-//		printf("DEBUG print (COMPR) for i=%d : %f\n", i, temp_molOrbitals[i]);
-
-	temp_primFunc = (double*)malloc(sizeof(double) *numOfPrimFunc );
-	for (int j = 1; j < numOfPrimFunc; ++j)
-		temp_primFunc[j] = primFunc[j];
-
-	psi_out = (double*)malloc(sizeof(double) * numOfNucl);
-
-	CUDA_CHECK_RETURN(cudaMemcpy(molOrbitals_cuda, temp_molOrbitals, sizeof(double)*numOfNucl*numOfPrimFunc, cudaMemcpyHostToDevice));
-	CUDA_CHECK_RETURN(cudaMemcpy(primFunc_cuda, temp_primFunc, sizeof(double)*numOfPrimFunc, cudaMemcpyHostToDevice));
-
-	getPsi_cuda<<<numOfNucl/*BLOCK_COUNT*/, numOfPrimFunc/*BLOCK_SIZE*/, numOfPrimFunc*sizeof(double)>>> (molOrbitals_cuda, primFunc_cuda, psi_cuda);
-
 	CUDA_CHECK_RETURN(cudaMemcpy(psi_out, psi_cuda, sizeof(double) * numOfNucl, cudaMemcpyDeviceToHost));
-
 	for (int i = 0; i < numOfNucl; ++i)
 		printf("[GPU] PSI[%d] = %f\n",i, psi_out[i]);
 	printf("\n");
 
-////////////////////////////////////////////                  END PSI DEBUG                                /////////////////////////////////////
-
-
-	getDPsi(numOfPrimFunc, numOfNucl, (const double **)molOrbitals, (const double **)dermodvar, dpsi, 1);
-
-
-	double *dpsi_cuda,  *dermodvar_cuda, *dermodvar_temp, *temp_dpsi;
-
-	CUDA_CHECK_RETURN(cudaMalloc((void **)&dpsi_cuda, sizeof(double)*3*numOfNucl));
-
-	CUDA_CHECK_RETURN(cudaMalloc((void **)&dermodvar_cuda, sizeof(double)*3*numOfPrimFunc));
-
-	temp_dpsi = (double*)malloc(sizeof(double) * 3 * numOfNucl);
-
-	dermodvar_temp = (double*)malloc(sizeof(double) * 3*numOfPrimFunc);
-
-	for (int i = 0; i < numOfPrimFunc; ++i)
-	{
-		dermodvar_temp[3*i] = dermodvar[i][0];
-		dermodvar_temp[3*i + 1] = dermodvar[i][1];
-		dermodvar_temp[3*i + 2] = dermodvar[i][2];
-//		printf("dermodvar[%d][%d] [0]=%f, [1]=%f, [2]=%f \n",3*i,i,dermodvar[i][0],dermodvar[i][1],dermodvar[i][2]);
-	}
-
-//	for (int i = 0; i < numOfPrimFunc*3; ++i)
-//		printf("dermodvar[%d] = %f \n",i,dermodvar_temp[i]);
-
-	CUDA_CHECK_RETURN(cudaMemcpy(dermodvar_cuda, dermodvar_temp, sizeof(double)*3*numOfPrimFunc, cudaMemcpyHostToDevice));
-
-	getDPsi_cuda<<<dim3(numOfNucl,3,1), numOfPrimFunc, numOfPrimFunc*sizeof(double)>>> (molOrbitals_cuda, dermodvar_cuda, dpsi_cuda);
-
-
 	CUDA_CHECK_RETURN(cudaMemcpy(temp_dpsi, dpsi_cuda, sizeof(double)*3*numOfNucl, cudaMemcpyDeviceToHost));
-
-//	printf("Rho is : %f", temp_dpsi);
 	for (int i = 0; i < numOfNucl; ++i)
-		printf("GPU dpsi[%d]: \t[%d] %f,\t[%d] %f,\t[%d] %f\n",i, 3*i,temp_dpsi[3*i], 3*i+1,temp_dpsi[3*i+1],i*3+2, temp_dpsi[3*i+2]);
-
-
-////////////////////////////////////////////                  BEGIN RHO DEBUG                                /////////////////////////////////////
-
-
-
-	double /**temp_psi, */*temp_occNo, *rho_out;
-
-	rho_out = (double*)malloc(sizeof(double));
-//	temp_psi = (double*)malloc(sizeof(double) * numOfNucl);
-	temp_occNo = (double*)malloc(sizeof(double) * numOfNucl);
-
-	for(int i = 0; i < numOfNucl; ++i)
-	{
-//		temp_psi[i] = psi[i];
-		temp_occNo[i] = occNo[i];
-	}
-
-	CUDA_CHECK_RETURN(cudaMalloc((void **)&occNo_cuda, sizeof(double) * numOfNucl));
-	CUDA_CHECK_RETURN(cudaMalloc((void **)&rho_cuda, sizeof(double)));
-
-//	CUDA_CHECK_RETURN(cudaMemcpy(psi_cuda, temp_psi, sizeof(double)*numOfNucl, cudaMemcpyHostToDevice));
-	CUDA_CHECK_RETURN(cudaMemcpy(occNo_cuda, temp_occNo, sizeof(double)*numOfNucl, cudaMemcpyHostToDevice));
-
-	double somedouble;
-	getRho(numOfNucl,  psi, occNo, &somedouble, 1);
-
-
-	getRho_cuda<<<1/*BLOCK_COUNT*/, numOfNucl/*BLOCK_SIZE*/, numOfNucl*sizeof(double)>>> (psi_cuda, occNo_cuda, rho_cuda);
-
+		printf("[GPU] dpsi[%d]: \t[%d] %f,\t[%d] %f,\t[%d] %f\n",i, 3*i,temp_dpsi[3*i], 3*i+1,temp_dpsi[3*i+1],i*3+2, temp_dpsi[3*i+2]);
 
 	CUDA_CHECK_RETURN(cudaMemcpy(rho_out, rho_cuda, sizeof(double), cudaMemcpyDeviceToHost));
-
 	printf("[GPU] Rho is : %f\n\n", *rho_out);
 
-
-////////////////////////////////////////////                  END RHO DEBUG                                /////////////////////////////////////
-
-
-	getDRho(numOfNucl,  psi,  (const double **)dpsi, occNo, drho, 1);
-
-
-
-////////////////////////////////////////////                  BEGIN DRHO DEBUG                                /////////////////////////////////////
-
-	double *drho_cuda, /**dpsi_cuda, *temp_dpsi, */*temp_drho;
-
-
-	CUDA_CHECK_RETURN(cudaMalloc((void **)&drho_cuda, sizeof(double)*3));
-/*	CUDA_CHECK_RETURN(cudaMalloc((void **)&dpsi_cuda, sizeof(double)*3*numOfNucl));*/
-
-
-	/*temp_dpsi = (double*)malloc(sizeof(double) * 3 * numOfNucl);*/
-	temp_drho = (double*)malloc(sizeof(double) * 3 );
-
-//	for(int i = 0; i < numOfNucl; ++i)
-//		for(int j = 0; j < 3; ++j)
-//		{
-//			temp_dpsi[j*numOfNucl + i] = dpsi[i][j];
-//		}
-
-//	for(int i = 0; i < numOfNucl * 3; ++i)
-//	{
-//		printf("DEBUG print (COMPR) for i=%d : %f\n", i, temp_dpsi[i]);
-//	}
-
-//	CUDA_CHECK_RETURN(cudaMemcpy(dpsi_cuda, temp_dpsi, sizeof(double)*numOfNucl*3, cudaMemcpyHostToDevice));
-
-
-	getDRho_cuda<<<3/*BLOCK_COUNT*/, numOfNucl/*BLOCK_SIZE*/, numOfNucl*sizeof(double)>>> (psi_cuda, dpsi_cuda, occNo_cuda, drho_cuda);
-
 	CUDA_CHECK_RETURN(cudaMemcpy(temp_drho, drho_cuda, sizeof(double)*3, cudaMemcpyDeviceToHost));
+	printf("[GPU]: DRHO [%f]:\t[%f]:\t[%f]:\n", temp_drho[0], temp_drho[1], temp_drho[2]);
+	////////////////////////////////////////////                  END COPY RESULTS FROM GPU                                /////////////////////////////////////
 
-	printf("GPU: DRHO [%f]:\t[%f]:\t[%f]:\n", temp_drho[0], temp_drho[1], temp_drho[2]);
-////////////////////////////////////////////                  END DRHO DEBUG                                /////////////////////////////////////
-
-
+	/*** WARNING !!!!!!!!!!!! WARNING ====>>>> RETURN 0   <<<<=====    WARNING !!!!!!!!!!!!!!!!!!!!!!!!**/
+	/*** WARNING !!!!!!!!!!!! WARNING ====>>>> RETURN 0   <<<<=====    WARNING !!!!!!!!!!!!!!!!!!!!!!!!**/
+	/*** WARNING !!!!!!!!!!!! WARNING ====>>>> RETURN 0   <<<<=====    WARNING !!!!!!!!!!!!!!!!!!!!!!!!**/
+	return 0;
+	/*** WARNING !!!!!!!!!!!! WARNING ====>>>> RETURN 0   <<<<=====    WARNING !!!!!!!!!!!!!!!!!!!!!!!!**/
+	/*** WARNING !!!!!!!!!!!! WARNING ====>>>> RETURN 0   <<<<=====    WARNING !!!!!!!!!!!!!!!!!!!!!!!!**/
+	/*** WARNING !!!!!!!!!!!! WARNING ====>>>> RETURN 0   <<<<=====    WARNING !!!!!!!!!!!!!!!!!!!!!!!!**/
 	getHesRho(numOfNucl, psi, (const double **)dpsi, occNo, (const double ***)hespsi, hesrho, 0);
 
 	CUDA_CHECK_RETURN(cudaFree(cur_cuda));
