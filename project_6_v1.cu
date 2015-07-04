@@ -375,8 +375,9 @@ int main()
 	getHesPSI(numOfPrimFunc, numOfNucl, (const double **)molOrbitals, (const double ***)hesmodvar, hespsi, 0 );
 
 	double somedouble;
+	int debugIterations = 1;
 	begin = clock();
-	for(int i = 0; i < 10000; ++i)
+	for(int i = 0; i < debugIterations; ++i)
 	{
 	getDistanceAbs(calcPoint, numOfNucl, r_dist, 0);
 
@@ -538,7 +539,7 @@ int main()
 ////////////////////////////////////////////                  END COPYING DUMMY variables to GPU MEMORY                                /////////////////////////////////////
 
 	begin = clock();
-	for(int i = 0; i < 10000; ++i)
+	for(int i = 0; i < debugIterations; ++i)
 	{
 	getDistanceComp_cuda<<<numOfNucl/*BLOCK_COUNT*/, 3/*BLOCK_SIZE*/, 3*sizeof(double)>>> (cur_cuda, origin_cuda, out_cuda, dist_cuda);
 
