@@ -1,10 +1,10 @@
 /*
  ============================================================================
  Name        : project_6_v1.cu
- Author      : Vanya
+ Author      : Ivan Syzonenko
  Version     :
- Copyright   : Your copyright notice
- Description : CUDA compute reciprocals
+ Copyright   : You can use this code only if your first name is Ivan
+ Description : CUDA QTAM program
  ============================================================================
  */
 
@@ -120,8 +120,8 @@ __global__ void getDPsi_cuda(const double* molOrbitals, const double* dermodvar,
 	__syncthreads();
 	if (threadIdx.x == 0)
 	{
-//		printf("I am [%d][%d] value = %f\n", blockIdx.x, blockIdx.y, dcopy[0]);
-		dpsi[blockIdx.x*3+ blockIdx.y] = dcopy[0];
+		printf("IN GPU: I am [%d][%d] value = %f\n", blockIdx.x, blockIdx.y, dcopy[0]);
+		dpsi[blockIdx.x*3 + blockIdx.y] = dcopy[0];
 	}
 }
 //getDRho_cuda<<<3/*BLOCK_COUNT*/, numOfNucl/*BLOCK_SIZE*/, numOfNucl*sizeof(double)>>> (psi_cuda, dpsi_cuda, occNo_cuda, drho_cuda);
@@ -2050,11 +2050,11 @@ void getDRho(const int numOfNucl, const double* psi, const double** dpsi, const 
 	for (int i = 0; i < numOfNucl; ++i)
 	{
 		drho[0] = drho[0] + 2* occNo[i] * psi[i] * dpsi[i][0];
-		printf("drho[0] = %f + 2 * %f * %f * %f (%f)\n",drho[0], occNo[i], psi[i], dpsi[i][0], 2* occNo[i] * psi[i] * dpsi[i][0] );
+//		printf("drho[0] = %f + 2 * %f * %f * %f (%f)\n",drho[0], occNo[i], psi[i], dpsi[i][0], 2* occNo[i] * psi[i] * dpsi[i][0] );
 		drho[1] = drho[1] + 2* occNo[i] * psi[i] * dpsi[i][1];
-		printf("drho[1] = %f + 2 * %f * %f * %f (%f)\n",drho[1], occNo[i], psi[i], dpsi[i][1], 2* occNo[i] * psi[i] * dpsi[i][1] );
+//		printf("drho[1] = %f + 2 * %f * %f * %f (%f)\n",drho[1], occNo[i], psi[i], dpsi[i][1], 2* occNo[i] * psi[i] * dpsi[i][1] );
 		drho[2] = drho[2] + 2* occNo[i] * psi[i] * dpsi[i][2];
-		printf("drho[2] = %f + 2 * %f * %f * %f (%f)\n",drho[2], occNo[i], psi[i], dpsi[i][2], 2* occNo[i] * psi[i] * dpsi[i][2] );
+//		printf("drho[2] = %f + 2 * %f * %f * %f (%f)\n",drho[2], occNo[i], psi[i], dpsi[i][2], 2* occNo[i] * psi[i] * dpsi[i][2] );
 	}
 
 	if (debug == 1)
