@@ -375,7 +375,7 @@ int main()
 	getHesPSI(numOfPrimFunc, numOfNucl, (const double **)molOrbitals, (const double ***)hesmodvar, hespsi, 0 );
 
 	double somedouble;
-	int debugIterations = 1;
+	int debugIterations = 100;
 	begin = clock();
 	for(int i = 0; i < debugIterations; ++i)
 	{
