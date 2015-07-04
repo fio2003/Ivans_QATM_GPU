@@ -10,25 +10,25 @@ If you want to try it:
 
 My current results on Intel i5-4690 CPU @ 3.50GHz and GeForce GTX 550 Ti :
 
-<b>GPU</b> time for mem COPY for 5 functions: 0.0000240000000000
-<b>GPU</b> time to COPY back results: 0.0000550000000000
+<p><b>GPU</b> time for mem COPY for 5 functions: 0.0000240000000000
+<p><b>GPU</b> time to COPY back results: 0.0000550000000000
 
-<p>[1 iterations]
+<p>[<b>1 iterations</b>]
 <p><b>CPU</b> time for 5 functions: 0.0000010000000000
 <p><b>GPU</b> time for 5 functions: 0.0000260000000000
 
-<p>[10 iterations]
+<p>[<b>10 iterations</b>]
 <p><b>CPU</b> time for 5 functions: 0.0000020000000000
 <p><b>GPU</b> time for 5 functions: 0.0000720000000000
 
-<p>[100 iterations]
+<p>[<b>100 iterations</b>]
 <p><b>CPU</b> time for 5 functions: 0.0000120000000000
 <p><b>GPU</b> time for 5 functions: 0.0006820000000000
 
-<p>[1000 iterations]
+<p>[<b>1000 iterations</b>]
 <p><b>CPU</b> time for 5 functions: 0.0001250000000000
 <p><b>GPU</b> time for 5 functions: 0.0173650000000000
 
-<p>[10000 iterations]
+<p>[<b>10000 iterations</b>]
 <p><b>CPU</b> time for 5 functions: 0.0012480000000000
 <p><b>GPU</b> time for 5 functions: 0.2143430000000000
